@@ -1,9 +1,15 @@
+#![feature(globs)]
+
 extern crate getopts;
 extern crate conway;
+extern crate ncurses;
 
 use getopts::{optflag, getopts, reqopt};
 use std::os;
 use conway::DuplexChannel;
+use ncurses::*;
+use std::io::Timer;
+use std::time::Duration;
 
 #[deriving(Clone)]
 struct GameState {
@@ -73,20 +79,19 @@ impl GameState {
     }
     
     fn print(&self) {
+        erase();
+    
         for row in range(0, self.rows) {
             for column in range(0, self.columns) {
                 let index = self.get_index(row, column);
             
-                let char = match self.positions[index] {
-                    0u8 => ' ',
-                    _   => '#'
-                };
-                
-                print!("{}", char);
+                if 1u8 == self.positions[index] {
+                    mvaddch(row as i32, column as i32, '#' as u32);
+                }
             }
-            
-            print!("\n");
         }
+        
+        refresh();
     }
     
     fn add_glider(&mut self, row: uint, column: uint) {
@@ -122,21 +127,41 @@ fn main() {
     };
     
     let thread_count: uint = from_str::<uint>(matches.opt_str("t").unwrap().as_slice()).unwrap();
-      
-    println!("Thread count: {}", thread_count);
     
-    let mut state = GameState::new(10, 50);
+    test_animation();
+    
+    test_concurrency(thread_count);
+}
+
+fn test_animation() {
+    let mut width = 120;
+    let mut height = 20;
+
+    initscr();
+    curs_set(CURSOR_INVISIBLE);
+    cbreak(); // enable <Ctrl+C> to kill game
+    noecho(); // don't show input
+    getmaxyx(stdscr, &mut height, &mut width);
+    timeout(2000);
+
+    let mut state = GameState::new(width as uint, height as uint);
     
     state.add_glider(1, 5);
     
-    state.print();
+    let mut timer = Timer::new().unwrap();
+    let periodic = timer.periodic(Duration::milliseconds(40));
     
-    state.progress(30).print();
+    for _ in range(0, 100u) {
+        state.print();
+        periodic.recv();
+        
+        state = state.next();        
+    }
     
-    do_test(thread_count);
+    endwin();
 }
 
-fn do_test(thread_count: uint) {
+fn test_concurrency(thread_count: uint) {
     let mut channels: Vec<DuplexChannel<uint>> = DuplexChannel::get_chain(thread_count);
     
     for i in range(0, thread_count).rev() {
