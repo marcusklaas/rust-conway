@@ -3,3 +3,10 @@
 name = "conway"
 version = "0.0.1"
 authors = ["Marcus Klaas <mail@marcusklaas.nl>"]
+
+[dependencies.ncurses]
+git = "https://github.com/jeaye/ncurses-rs.git"
+
+[[bin]]
+
+name = "main"
