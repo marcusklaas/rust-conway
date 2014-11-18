@@ -3,16 +3,14 @@
 extern crate getopts;
 extern crate conway;
 extern crate ncurses;
-extern crate test;
 
 use getopts::{optflag, getopts, reqopt};
 use std::os;
-use conway::{GameState, DuplexChannel};
+use conway::comm::DuplexChannel;
+use conway::GameState;
 use ncurses::*;
 use std::io::Timer;
 use std::time::Duration;
-
-use self::test::Bencher;
 
 fn main() {
     let args: Vec<String> = os::args();
@@ -54,7 +52,7 @@ fn test_animation() {
         
         //state.print();
         
-        let new_state = progress_in_parallel(&state, time, 5);
+        let new_state = progress_in_parallel(&state, time, 2);
         
         assert!(new_state.columns == width as uint);
         assert!(new_state.rows == height as uint);
