@@ -10,3 +10,18 @@ git = "https://github.com/jeaye/ncurses-rs.git"
 [[bin]]
 
 name = "main"
+
+# The release profile, used for `cargo build --release`
+[profile.release]
+opt-level = 3
+debug = false
+
+# The testing profile, used for `cargo test`
+[profile.test]
+opt-level = 0
+debug = true
+
+# The benchmarking profile, used for `cargo bench`
+[profile.bench]
+opt-level = 3
+debug = false

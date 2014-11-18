@@ -3,6 +3,7 @@
 extern crate getopts;
 extern crate conway;
 extern crate ncurses;
+extern crate test;
 
 use getopts::{optflag, getopts, reqopt};
 use std::os;
@@ -11,6 +12,7 @@ use conway::GameState;
 use ncurses::*;
 use std::io::Timer;
 use std::time::Duration;
+use test::Bencher;
 
 fn main() {
     let args: Vec<String> = os::args();
@@ -67,7 +69,7 @@ fn test_animation(thread_count: uint) {
 
 fn progress_in_parallel(state: &GameState, steps: uint, thread_count: uint) -> GameState {
     let mut state_list = state.split(thread_count);
-    let mut channels: Vec<DuplexChannel<Vec<u8>>> = DuplexChannel::get_chain(thread_count);
+    let mut channels = DuplexChannel::<Vec<u8>>::get_chain(thread_count);
     let (result_sender, result_receiver) = channel::<(uint, GameState)>();
     
     for i in range(0, thread_count).rev() {
@@ -104,5 +106,38 @@ fn progress_in_parallel(state: &GameState, steps: uint, thread_count: uint) -> G
     let state_vec = result_vec.into_iter().map(|(_, state)| state).collect();
     
     GameState::from_parts(&state_vec).unwrap()
+}
+
+#[bench]
+fn bench_20_steps_serial(b: &mut Bencher) {
+    let mut state = GameState::new(1000, 1000);
+    
+    state.add_glider(1, 5);
+    
+    b.iter(|| {
+        state.progress(20)
+    });
+}
+
+#[bench]
+fn bench_20_steps_concurrent(b: &mut Bencher) {
+    let mut state = GameState::new(1000, 1000);
+    
+    state.add_glider(1, 5);
+    
+    b.iter(|| {
+        progress_in_parallel(&state, 20, 2)
+    });
+}
+
+#[bench]
+fn bench_20_steps_quad(b: &mut Bencher) {
+    let mut state = GameState::new(1000, 1000);
+    
+    state.add_glider(1, 5);
+    
+    b.iter(|| {
+        progress_in_parallel(&state, 20, 4)
+    });
 }
 
