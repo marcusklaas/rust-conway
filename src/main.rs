@@ -9,10 +9,13 @@ use getopts::{optflag, getopts, reqopt};
 use std::os;
 use conway::comm::DuplexChannel;
 use conway::GameState;
+use conway::pattern::{get_glider, Pattern};
 use ncurses::*;
 use std::io::Timer;
 use std::time::Duration;
 use test::Bencher;
+use std::rand::Rng;
+use std::rand;
 
 fn main() {
     let args: Vec<String> = os::args();
@@ -29,10 +32,12 @@ fn main() {
     
     let thread_count: uint = from_str::<uint>(matches.opt_str("t").unwrap().as_slice()).unwrap();
     
-    test_animation(thread_count);
+    loop {
+        test_animation();
+    }
 }
 
-fn test_animation(thread_count: uint) {
+fn test_animation() {
     let mut width = 120;
     let mut height = 20;
 
@@ -41,27 +46,40 @@ fn test_animation(thread_count: uint) {
     cbreak(); // enable <Ctrl+C> to kill program
     noecho(); // don't show input
     getmaxyx(stdscr, &mut height, &mut width);
-
-    let mut state = GameState::new(height as uint, width as uint);
     
-    state.add_glider(1, 5);
+    let mut state = GameState::new(height as uint, width as uint);
+    let mut glider = get_glider();
+    let mut rng = rand::task_rng();
+    let glider_count = 30u;
+    
+    // produce number of gliders
+    for _ in range(0, glider_count) {
+        let rotations = rng.gen::<u8>() % 4;
+        
+        for _ in range(0, rotations) {
+            glider.rotate_right();
+        }
+        
+        let start_row = rng.gen::<uint>() % (height as uint - glider.get_height());
+        let start_col = rng.gen::<uint>() % (width as uint - glider.get_width());
+        
+        state.add_pattern(&glider, start_row, start_col);
+    }
     
     let mut timer = Timer::new().unwrap();
     let periodic = timer.periodic(Duration::milliseconds(40));
     
-    for time in range(0, 180u) {
+    for _ in range(0, 800u) {
         erase();
         
-        let new_state = progress_in_parallel(&state, time, thread_count);
-        
-        new_state.print(|row, column| { 
+        state.print(|row, column| { 
             mvaddch(row as i32, column as i32, '#' as u32);
         });
         
         refresh();
         periodic.recv();
         
-        //state.progress(1);        
+        state.progress(1);        
     }
     
     endwin();
@@ -111,8 +129,9 @@ fn progress_in_parallel(state: &GameState, steps: uint, thread_count: uint) -> G
 #[bench]
 fn bench_20_steps_serial(b: &mut Bencher) {
     let mut state = GameState::new(1000, 1000);
+    let glider = get_glider();
     
-    state.add_glider(1, 5);
+    state.add_pattern(&glider, 1, 5);
     
     b.iter(|| {
         state.progress(20)
@@ -122,8 +141,9 @@ fn bench_20_steps_serial(b: &mut Bencher) {
 #[bench]
 fn bench_20_steps_concurrent(b: &mut Bencher) {
     let mut state = GameState::new(1000, 1000);
+    let glider = get_glider();
     
-    state.add_glider(1, 5);
+    state.add_pattern(&glider, 1, 5);
     
     b.iter(|| {
         progress_in_parallel(&state, 20, 2)
@@ -133,8 +153,9 @@ fn bench_20_steps_concurrent(b: &mut Bencher) {
 #[bench]
 fn bench_20_steps_quad(b: &mut Bencher) {
     let mut state = GameState::new(1000, 1000);
+    let glider = get_glider();
     
-    state.add_glider(1, 5);
+    state.add_pattern(&glider, 1, 5);
     
     b.iter(|| {
         progress_in_parallel(&state, 20, 4)

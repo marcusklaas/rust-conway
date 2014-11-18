@@ -1,6 +1,8 @@
 use std::mem::swap;
+use pattern::Pattern;
 
 pub mod comm;
+pub mod pattern;
 
 pub struct GameState {
     pub rows: uint,
@@ -110,19 +112,9 @@ impl GameState {
         }
     }
     
-    pub fn add_glider(&mut self, row: uint, column: uint) {
-        let pattern = [(0u, 1u), (1u, 2u), (2u, 0u), (2u, 1u), (2u, 2u)];
-        let translated_pattern: Vec<(uint, uint)> = pattern
-                                    .iter()
-                                    .map(|&(x, y)| (x + row, y + column))
-                                    .collect();
-        
-        self.add_pattern(& translated_pattern);
-    }
-    
-    fn add_pattern(&mut self, pattern: & Vec<(uint, uint)>) {
-        for &(row, column) in pattern.iter() {            
-            self[(row, column)] = 1u8;
+    pub fn add_pattern(&mut self, pattern: &Pattern, start_row: uint, start_column: uint) {
+        for &(row, column) in pattern.iter() {
+            self[(start_row + row, start_column + column)] = 1u8;
         }
     }
     
