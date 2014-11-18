@@ -27,10 +27,10 @@ fn main() {
     
     let thread_count: uint = from_str::<uint>(matches.opt_str("t").unwrap().as_slice()).unwrap();
     
-    test_animation();
+    test_animation(thread_count);
 }
 
-fn test_animation() {
+fn test_animation(thread_count: uint) {
     let mut width = 120;
     let mut height = 20;
 
@@ -50,12 +50,7 @@ fn test_animation() {
     for time in range(0, 180u) {
         erase();
         
-        //state.print();
-        
-        let new_state = progress_in_parallel(&state, time, 2);
-        
-        assert!(new_state.columns == width as uint);
-        assert!(new_state.rows == height as uint);
+        let new_state = progress_in_parallel(&state, time, thread_count);
         
         new_state.print(|row, column| { 
             mvaddch(row as i32, column as i32, '#' as u32);
@@ -71,7 +66,7 @@ fn test_animation() {
 }
 
 fn progress_in_parallel(state: &GameState, steps: uint, thread_count: uint) -> GameState {
-    let mut state_list = state.split(thread_count).unwrap();
+    let mut state_list = state.split(thread_count);
     let mut channels: Vec<DuplexChannel<Vec<u8>>> = DuplexChannel::get_chain(thread_count);
     let (result_sender, result_receiver) = channel::<(uint, GameState)>();
     
@@ -86,16 +81,16 @@ fn progress_in_parallel(state: &GameState, steps: uint, thread_count: uint) -> G
                 channel.send_bottom(state.read_bottom());
             
                 match channel.receive_top() {
-                    Some(x) => state.set_top(&x),
+                    Some(x) => state.set_top(x.as_slice()),
                     None    => ()
                 };
                 
                 match channel.receive_bottom() {
-                    Some(x) => state.set_bottom(&x),
+                    Some(x) => state.set_bottom(x.as_slice()),
                     None    => ()
                 };
                 
-                state.progress(1)
+                state.progress(1);
             }
             
             my_result_sender.send((i, state));

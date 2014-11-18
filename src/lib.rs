@@ -9,6 +9,23 @@ pub struct GameState {
     back: Vec<u8>
 }
 
+impl Index<(uint, uint), u8> for GameState {
+    fn index(&self, _index: &(uint, uint)) -> &u8 {
+        let (row, column) = *_index;
+        
+        &self.front[self.get_index(row, column)]
+    }
+}
+
+impl IndexMut<(uint, uint), u8> for GameState {
+    fn index_mut(&mut self, _index: &(uint, uint)) -> &mut u8 {
+        let (row, column) = *_index;
+        let real_index = self.get_index(row, column);
+        
+        &mut self.front[real_index]
+    }
+}
+
 impl GameState {
     pub fn new(rows: uint, columns: uint) -> GameState {
         let element_count = (rows + 2) * (columns + 2);
@@ -26,36 +43,33 @@ impl GameState {
             return None;
         }
         
-        let columns = parts[0].columns;
-        let mut front = Vec::from_elem(columns + 2, 0u8);
+        let mut result = GameState::new(
+            parts.iter().fold(0u, |acc, val| acc + val.rows),
+            parts[0].columns
+        );
         
-        for state in parts.iter() {        
-            for elem in state.front.slice_or_fail(&(columns + 2), &((state.rows + 1) * (columns + 2)))
-              .iter().map(|&x| x) {
-                front.push(elem);
+        let mut result_row = 0;
+        
+        for state in parts.iter() {
+            for line_number in range(0, state.rows) {
+                let row = state.read_line(line_number);
+                
+                result.set_line(result_row, row);
+                result_row += 1;
             }
         }
         
-        for _ in range(0, columns + 2) {
-            front.push(0u8);
-        }
-        
-        let elem_count = front.len();
-        let rows = elem_count/ (columns + 2) - 2;
-        
-        Some(GameState {
-            rows: rows,
-            columns: columns,
-            front: front,
-            back: Vec::from_elem(elem_count, 0u8)
-        })
+        Some(result)
+    }
+    
+    fn get_index(&self, row: uint, column: uint) -> uint {    
+        (row + 1) * (self.columns + 2) + column + 1
     }
 
     fn next(&mut self) {
         for row in range(0, self.rows) {
             for column in range(0, self.columns) {
                 let index = self.get_index(row, column);
-            
                 self.back[index] = self.next_value(row, column); 
             }
         }
@@ -64,32 +78,20 @@ impl GameState {
     }
     
     pub fn progress(&mut self, steps: uint) {
-        for _ in range(0, steps) {
-            self.next();
-        }
-    }
-    
-    fn read(&self, row: uint, column: uint) -> u8 {
-        let index = self.get_index(row, column);
-    
-        self.front[index]
-    }
-    
-    fn get_index(&self, row: uint, column: uint) -> uint {
-        (row + 1) * (self.columns + 2) + column + 1
+        range(0, steps).map(|_| self.next()).last();
     }
     
     fn next_value(&self, row: uint, column: uint) -> u8 {
-        let neighbour_sum = self.read(row - 1, column - 1) 
-                          + self.read(row - 1, column) 
-                          + self.read(row - 1, column + 1) 
-                          + self.read(row, column - 1) 
-                          + self.read(row, column + 1) 
-                          + self.read(row + 1, column - 1) 
-                          + self.read(row + 1, column) 
-                          + self.read(row + 1, column + 1);
+        let neighbour_sum = self[(row - 1, column - 1)]
+                          + self[(row - 1, column)]
+                          + self[(row - 1, column + 1)]
+                          + self[(row, column - 1)]
+                          + self[(row, column + 1)]
+                          + self[(row + 1, column - 1)]
+                          + self[(row + 1, column)]
+                          + self[(row + 1, column + 1)];
                           
-        let cell = self.read(row, column);
+        let cell = self[(row, column)];
                           
         match (cell, neighbour_sum) {
             (_, 3) => 1u8,
@@ -100,10 +102,8 @@ impl GameState {
     
     pub fn print(&self, print_funk: |uint, uint| -> ()) {
         for row in range(0, self.rows) {
-            for column in range(0, self.columns) {
-                let index = self.get_index(row, column);
-            
-                if 1u8 == self.front[index] {
+            for column in range(0, self.columns) {            
+                if 1u8 == self[(row, column)] {
                     print_funk(row, column);
                 }
             }
@@ -121,57 +121,62 @@ impl GameState {
     }
     
     fn add_pattern(&mut self, pattern: & Vec<(uint, uint)>) {
-        for &(row, column) in pattern.iter() {
-            let index = self.get_index(row, column);
-            
-            self.front[index] = 1u8;
+        for &(row, column) in pattern.iter() {            
+            self[(row, column)] = 1u8;
         }
     }
     
-    pub fn split(&self, pieces: uint) -> Result<Vec<GameState>, &'static str> {        
-        if pieces > self.rows {
-            return Err("Not enough rows to split into this many pieces!");
-        }
-        
-        Ok(Vec::from_fn(pieces, |i| {
-            let row_low = self.rows * i / pieces; // inclusive!
-            let row_high = self.rows * (i + 1) / pieces; // exclusive!
-            let offset = (self.columns + 2) * (row_low + 1);
+    pub fn split(&self, pieces: uint) -> Vec<GameState> {                
+        Vec::from_fn(pieces, |i| {
+            let row_from = self.rows * i / pieces;
+            let row_to   = self.rows * (i + 1) / pieces;
+            let mut part = GameState::new(row_to - row_from, self.columns);
             
-            let mut part = GameState::new(row_high - row_low, self.columns);
-            
-            for j in range(0, (row_high - row_low) * (self.columns + 2)) {
-                let index = self.columns + j;
-            
-                part.front[index] = self.front[offset + j];
+            for (part_row_number, row_number) in range(row_from, row_to).enumerate() {
+                part.set_line(part_row_number, self.read_line(row_number));
             }
             
             part
-        }))
+        })
     }
     
     pub fn read_top(&self) -> Vec<u8> {
-        self.read_line(1)
+        let mut vec = Vec::with_capacity(self.columns);
+        
+        vec.push_all(self.read_line(0));
+        
+        vec
     }
     
     pub fn read_bottom(&self) -> Vec<u8> {
-        self.read_line(self.rows)
+        let mut vec = Vec::with_capacity(self.columns);
+        
+        vec.push_all(self.read_line(self.rows - 1));
+        
+        vec
     }
     
-    // line number starts at 1. returns self.columns + 2 elements
-    fn read_line(&self, line: uint) -> Vec<u8> {
-        self.front.slice_or_fail(&(line * (self.columns + 2)), &((line + 1) * (self.columns + 2))).iter().map(|&x| x).collect()
+    fn read_line<'a>(&'a self, line: uint) -> &'a [u8] {
+        let index_from = self.get_index(line, 0);
+        let index_to   = self.get_index(line, self.columns);
+    
+        self.front.slice_or_fail(&index_from, &index_to)
     }
     
-    pub fn set_top(&mut self, line: &Vec<u8>) {
-        for (i, value) in line.iter().enumerate() {
-            self.front[i] = *value;
+    #[allow(unsigned_negation)]
+    pub fn set_top(&mut self, line: &[u8]) {
+        self.set_line(-1u, line);
+    }
+    
+    pub fn set_bottom(&mut self, line: &[u8]) {
+        let line_number = self.rows;
+        
+        self.set_line(line_number, line);
+    }
+    
+    fn set_line(&mut self, line_number: uint, line: &[u8]) {    
+        for (i, &value) in line.iter().enumerate() {
+            self[(line_number, i)] = value;
         }
-    }
-    
-    pub fn set_bottom(&mut self, line: &Vec<u8>) {
-        for (i, value) in line.iter().enumerate() {
-            self.front[(1 + self.rows) * (self.columns + 2) + i] = *value;
-        }
-    }
+    }    
 }
