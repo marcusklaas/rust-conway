@@ -5,11 +5,11 @@ extern crate conway;
 extern crate ncurses;
 extern crate test;
 
-use getopts::{optflag, getopts, reqopt};
+use getopts::{optflag, getopts, optopt};
 use std::os;
 use conway::comm::DuplexChannel;
 use conway::GameState;
-use conway::pattern::{get_glider, Pattern};
+use conway::pattern::{get_glider, get_acorn, Pattern};
 use ncurses::*;
 use std::io::Timer;
 use std::time::Duration;
@@ -21,33 +21,25 @@ fn main() {
     let args: Vec<String> = os::args();
 
     let opts = [
-        reqopt("t", "threads", "set number of concurrent threads", "THREAD_COUNT"),
+        optopt("t", "threads", "set number of concurrent threads", "THREAD_COUNT"),
         optflag("h", "help", "print this help menu")
     ];
     
-    let matches = match getopts(args.tail(), opts) {
-        Ok(m) => { m }
-        Err(f) => { panic!(f.to_string()) }
+    let thread_count = match getopts(args.tail(), opts) {
+        Ok(matches) => match matches.opt_str("t") {
+            None    => 1u,
+            Some(x) => from_str::<uint>(x.as_slice()).unwrap()
+        },
+        Err(f)      => 1u
     };
     
-    let thread_count: uint = from_str::<uint>(matches.opt_str("t").unwrap().as_slice()).unwrap();
-    
     loop {
-        test_animation();
+        test_animation(acorn_test_state);
     }
 }
 
-fn test_animation() {
-    let mut width = 120;
-    let mut height = 20;
-
-    initscr();
-    curs_set(CURSOR_INVISIBLE);
-    cbreak(); // enable <Ctrl+C> to kill program
-    noecho(); // don't show input
-    getmaxyx(stdscr, &mut height, &mut width);
-    
-    let mut state = GameState::new(height as uint, width as uint);
+fn glider_party_state(rows: uint, columns: uint) -> GameState {
+    let mut state = GameState::new(rows, columns);
     let mut glider = get_glider();
     let mut rng = rand::task_rng();
     let glider_count = 30u;
@@ -60,12 +52,35 @@ fn test_animation() {
             glider.rotate_right();
         }
         
-        let start_row = rng.gen::<uint>() % (height as uint - glider.get_height());
-        let start_col = rng.gen::<uint>() % (width as uint - glider.get_width());
+        let start_row = rng.gen::<uint>() % (rows - glider.get_height());
+        let start_col = rng.gen::<uint>() % (columns - glider.get_width());
         
         state.add_pattern(&glider, start_row, start_col);
     }
     
+    state
+}
+
+fn acorn_test_state(rows: uint, columns: uint) -> GameState {
+    let mut state = GameState::new(rows, columns);
+    let acorn = get_acorn();
+    
+    state.add_pattern(&acorn, rows/ 2, columns/ 2);
+    
+    state
+}
+
+fn test_animation(state_generator: |uint, uint| -> GameState) {
+    let mut width = 120;
+    let mut height = 20;
+
+    initscr();
+    curs_set(CURSOR_INVISIBLE);
+    cbreak(); // enable <Ctrl+C> to kill program
+    noecho(); // don't show input
+    getmaxyx(stdscr, &mut height, &mut width);
+    
+    let mut state = state_generator(height as uint, width as uint);
     let mut timer = Timer::new().unwrap();
     let periodic = timer.periodic(Duration::milliseconds(40));
     
