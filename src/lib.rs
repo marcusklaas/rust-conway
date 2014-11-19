@@ -133,19 +133,11 @@ impl GameState {
     }
     
     pub fn read_top(&self) -> Vec<u8> {
-        let mut vec = Vec::with_capacity(self.columns);
-        
-        vec.push_all(self.read_line(0));
-        
-        vec
+        self.read_line(0).iter().map(|&x| x).collect()
     }
     
     pub fn read_bottom(&self) -> Vec<u8> {
-        let mut vec = Vec::with_capacity(self.columns);
-        
-        vec.push_all(self.read_line(self.rows - 1));
-        
-        vec
+        self.read_line(self.rows - 1).iter().map(|&x| x).collect()
     }
     
     fn read_line<'a>(&'a self, line: uint) -> &'a [u8] {

@@ -37,28 +37,28 @@ impl<T: Send> DuplexChannel<T> {
     pub fn send_top(&self, value: T) {
         match self.top_sender {
             Some(ref x) => x.send(value),
-            None    => ()
+            None        => ()
         }
     }
     
     pub fn receive_top(&self) -> Option<T> {
         match self.top_receiver {
             Some(ref x) => Some(x.recv()),
-            None    => None
+            None        => None
         }
     }
     
     pub fn send_bottom(&self, value: T) {
         match self.bottom_sender {
             Some(ref x) => x.send(value),
-            None    => ()
+            None        => ()
         }
     }
     
     pub fn receive_bottom(&self) -> Option<T> {
         match self.bottom_receiver {
             Some(ref x) => Some(x.recv()),
-            None    => None
+            None        => None
         }
     }
 }

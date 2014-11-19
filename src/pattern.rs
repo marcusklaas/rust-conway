@@ -5,15 +5,10 @@ use std::cmp::{min, max};
 use std::mem::{replace, swap};
 use self::core::slice::Items;
 
-// these values are actually extremes. so 2x2 figure would have rows = 1 and columns = 1
-struct Bounds {
-    rows:    uint,
-    columns: uint
-}
-
 pub struct Pattern {
     coordinate_list: Box<[(uint, uint)]>,
-    bounds: Bounds
+    farthest_right: uint,
+    farthest_down:  uint
 }
 
 impl Pattern {
@@ -26,20 +21,18 @@ impl Pattern {
     
         Pattern {
             coordinate_list: vec.into_boxed_slice(),
-            bounds: Bounds {
-                rows:    pair_list.iter().fold(0, |acc, &(row, _)| max(acc, row)) - top,
-                columns: pair_list.iter().fold(0, |acc, &(_, col)| max(acc, col)) - left,
-            }
+            farthest_right:  pair_list.iter().fold(0, |acc, &(_, col)| max(acc, col)) - left,
+            farthest_down:   pair_list.iter().fold(0, |acc, &(row, _)| max(acc, row)) - top
         }
     }
 
-    // fix this! we should be able to work it out without allocation
     pub fn rotate_right(&mut self) {
-        let mut vec: Vec<(uint, uint)> = self.coordinate_list.iter().map(|&(row, col)| (col, self.bounds.rows - row)).collect();
-        let boxed = vec.into_boxed_slice();
+        for pair in self.coordinate_list.iter_mut() {
+            let (row, col) = *pair;
+            *pair = (col, self.farthest_down - row);
+        }
         
-        replace(&mut self.coordinate_list, boxed);
-        swap(&mut self.bounds.rows, &mut self.bounds.columns);
+        swap(&mut self.farthest_down, &mut self.farthest_right);
     }
     
     pub fn iter<'r>(&'r self) -> Items<(uint, uint)> {
@@ -47,11 +40,11 @@ impl Pattern {
     }
     
     pub fn get_width(&self) -> uint {
-        self.bounds.columns + 1
+        self.farthest_right + 1
     }
     
     pub fn get_height(&self) -> uint {
-        self.bounds.rows + 1
+        self.farthest_down + 1
     }
 }
 
@@ -60,6 +53,5 @@ pub fn get_glider() -> Pattern {
 }
 
 pub fn get_acorn() -> Pattern {
-    Pattern::from_pairs(&[(0, 1), (1, 3), (2, 0), (2, 1), (2, 4),
-      (2, 5), (2, 6)])
+    Pattern::from_pairs(&[(0, 1), (1, 3), (2, 0), (2, 1), (2, 4), (2, 5), (2, 6)])
 }
