@@ -25,10 +25,13 @@ fn main() {
         optflag("h", "help", "print this help menu")
     ];
     
-    let thread_count = match getopts(args.tail(), opts) {
+    let thread_count = match getopts(args.tail(), &opts) {
         Ok(matches) => match matches.opt_str("t") {
             None    => 1u,
-            Some(x) => from_str::<uint>(x.as_slice()).unwrap()
+            Some(x) => match from_str::<uint>(x.as_slice()) {
+                Some(number) => number,
+                None         => 1u
+            }
         },
         Err(f)      => 1u
     };
