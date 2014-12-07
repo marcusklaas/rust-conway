@@ -33,7 +33,7 @@ fn main() {
                 None         => 1u
             }
         },
-        Err(f)      => 1u
+        Err(..)     => 1u
     };
     
     loop {
@@ -78,7 +78,7 @@ fn test_animation(state_generator: |uint, uint| -> GameState) {
     let mut height = 20;
 
     initscr();
-    curs_set(CURSOR_INVISIBLE);
+    curs_set(CURSOR_VISIBILITY::CURSOR_INVISIBLE);
     cbreak(); // enable <Ctrl+C> to kill program
     noecho(); // don't show input
     getmaxyx(stdscr, &mut height, &mut width);
